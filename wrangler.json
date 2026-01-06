@@ -1,0 +1,16 @@
+{
+	"compatibility_date": "2025-10-08",
+	"main": "src/index.ts",
+	"name": "cf-d1-template",
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_id": "19533a78-ba27-4610-8b19-389ee137f0f7",
+			"database_name": "cf-d1-template-database"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}
