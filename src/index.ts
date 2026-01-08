@@ -1,4 +1,5 @@
 import { renderHtml } from "./renderHtml";
+import { renderSnowPage } from "./renderSnowPage";
 import { fetchLocationForecast, LOCATIONS, ForecastHourly } from "./opensnow";
 
 /**
@@ -182,6 +183,22 @@ export default {
 					headers: { "content-type": "application/json" },
 				}
 			);
+		}
+
+		// Snow forecast page for Palisades Tahoe
+		if (url.pathname === "/snow") {
+			const stmt = env.DB.prepare(`
+				SELECT display_at, temp 
+				FROM hourly_forecasts 
+				WHERE location_id = 141 
+				ORDER BY display_at ASC 
+				LIMIT 120
+			`);
+			const { results } = await stmt.all<{ display_at: string; temp: number }>();
+			
+			return new Response(renderSnowPage(results), {
+				headers: { "content-type": "text/html" },
+			});
 		}
 
 		const stmt = env.DB.prepare("SELECT * FROM comments LIMIT 3");
