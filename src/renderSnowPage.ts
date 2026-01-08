@@ -51,6 +51,32 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		.u-wrap {
 			display: block !important;
 		}
+		
+		/* Tooltip styling */
+		.chart-tooltip {
+			position: absolute;
+			background: rgba(15, 23, 42, 0.95);
+			border: 1px solid rgba(148, 163, 184, 0.3);
+			border-radius: 8px;
+			padding: 8px 12px;
+			font-size: 13px;
+			color: #e2e8f0;
+			pointer-events: none;
+			z-index: 100;
+			white-space: nowrap;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+			transform: translate(-50%, -100%);
+			margin-top: -12px;
+		}
+		.chart-tooltip .value {
+			font-weight: 600;
+			font-size: 15px;
+		}
+		.chart-tooltip .time {
+			color: #94a3b8;
+			font-size: 11px;
+			margin-top: 2px;
+		}
 	</style>
 </head>
 <body class="bg-slate-900 min-h-screen">
@@ -125,13 +151,81 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		// Parse the data
 		const timestamps = rawData.map(d => new Date(d.display_at).getTime() / 1000);
 		const temps = rawData.map(d => d.temp);
-		const pops = rawData.map(d => d.pop ?? 0);
+		const pops = rawData.map(d => ((d.pop ?? 0) * 100)); // Convert 0.91 to 91%
 		const precipAccums = rawData.map(d => d.precip_accum ?? 0);
 		
 		// uPlot data format: [timestamps, series1]
 		const tempData = [timestamps, temps];
 		const popData = [timestamps, pops];
 		const precipData = [timestamps, precipAccums];
+		
+		// Tooltip element
+		let tooltip = null;
+		
+		function createTooltip() {
+			if (tooltip) return tooltip;
+			tooltip = document.createElement('div');
+			tooltip.className = 'chart-tooltip';
+			tooltip.style.display = 'none';
+			document.body.appendChild(tooltip);
+			return tooltip;
+		}
+		
+		function hideTooltip() {
+			if (tooltip) tooltip.style.display = 'none';
+		}
+		
+		function showTooltip(u, idx, valueFormatter, seriesColor) {
+			if (!tooltip) createTooltip();
+			if (idx == null || idx < 0 || idx >= u.data[0].length) {
+				hideTooltip();
+				return;
+			}
+			
+			const ts = u.data[0][idx];
+			const val = u.data[1][idx];
+			if (val == null) {
+				hideTooltip();
+				return;
+			}
+			
+			const date = new Date(ts * 1000);
+			const timeStr = date.toLocaleString('en-US', { 
+				weekday: 'short', 
+				month: 'short', 
+				day: 'numeric',
+				hour: 'numeric',
+				minute: '2-digit'
+			});
+			
+			tooltip.innerHTML = \`
+				<div class="value" style="color: \${seriesColor}">\${valueFormatter(val)}</div>
+				<div class="time">\${timeStr}</div>
+			\`;
+			
+			// Position tooltip at cursor
+			const left = u.valToPos(ts, 'x', true) + u.over.getBoundingClientRect().left + window.scrollX;
+			const top = u.valToPos(val, 'y', true) + u.over.getBoundingClientRect().top + window.scrollY;
+			
+			tooltip.style.left = left + 'px';
+			tooltip.style.top = top + 'px';
+			tooltip.style.display = 'block';
+		}
+		
+		// Tooltip plugin factory
+		function tooltipPlugin(valueFormatter, seriesColor) {
+			return {
+				hooks: {
+					setCursor: (u) => {
+						const idx = u.cursor.idx;
+						showTooltip(u, idx, valueFormatter, seriesColor);
+					},
+					leave: () => {
+						hideTooltip();
+					}
+				}
+			};
+		}
 		
 		// Day/night background plugin
 		function dayNightPlugin() {
@@ -244,11 +338,11 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		}
 		
 		// Create chart options
-		function createChartOptions(width, height, yAxisFormatter, seriesColor, seriesLabel, showXAxis = false) {
+		function createChartOptions(width, height, yAxisFormatter, tooltipFormatter, seriesColor, seriesLabel, showXAxis = false) {
 			return {
 				width: width,
 				height: height,
-				plugins: [dayNightPlugin()],
+				plugins: [dayNightPlugin(), tooltipPlugin(tooltipFormatter, seriesColor)],
 				scales: {
 					x: {
 						time: true,
@@ -325,6 +419,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				width, 
 				height, 
 				(u, splits) => splits.map(v => v + '°'),
+				(v) => Math.round(v) + '°F',
 				'rgb(249, 115, 22)', // orange-500
 				'Temperature',
 				false
@@ -337,6 +432,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				width,
 				height,
 				(u, splits) => splits.map(v => v + '%'),
+				(v) => Math.round(v) + '%',
 				'rgb(56, 189, 248)', // sky-400
 				'Precipitation Chance',
 				false
@@ -351,6 +447,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				width,
 				height + 30, // Extra height for x-axis labels
 				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
+				(v) => v.toFixed(2) + ' in',
 				'rgb(52, 211, 153)', // emerald-400
 				'Precipitation',
 				true
@@ -363,13 +460,20 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		}
 		
 		// Initialize
+		createTooltip();
 		initCharts();
+		
+		// Hide tooltip on scroll
+		document.getElementById('charts-scroll-container').addEventListener('scroll', () => {
+			hideTooltip();
+		});
 		
 		// Handle resize
 		let resizeTimeout;
 		window.addEventListener('resize', () => {
 			clearTimeout(resizeTimeout);
 			resizeTimeout = setTimeout(() => {
+				hideTooltip();
 				initCharts();
 			}, 150);
 		});
