@@ -33,7 +33,7 @@ async function upsertHourlyForecast(
 	await db
 		.prepare(sql)
 		.bind(
-			locationId,
+			String(locationId),
 			forecast.display_at,
 			forecast.display_at_local_label,
 			forecast.temp,
@@ -105,7 +105,7 @@ async function processLocationForecasts(
 					updated_at = CURRENT_TIMESTAMP`
 			)
 			.bind(
-				location.id,
+				String(location.id),
 				forecast.display_at,
 				forecast.display_at_local_label,
 				forecast.temp,
@@ -190,7 +190,7 @@ export default {
 			const stmt = env.DB.prepare(`
 				SELECT display_at, temp 
 				FROM hourly_forecasts 
-				WHERE location_id = 141 
+				WHERE location_id = '141' 
 				ORDER BY display_at ASC 
 				LIMIT 120
 			`);
