@@ -185,18 +185,21 @@ export default {
 			);
 		}
 
-		// Snow forecast page for Palisades Tahoe
+		// Snow forecast page for Palisades / Alpine
 		if (url.pathname === "/snow") {
+			const locationParam = url.searchParams.get("location") || "palisades";
+			const locationId = locationParam === "alpine" ? "4458" : "141";
+			
 			const stmt = env.DB.prepare(`
 				SELECT display_at, temp, pop, precip_accum, precip_snow, precip_mix, precip_rain, snow_level 
 				FROM hourly_forecasts 
-				WHERE location_id = '141' 
+				WHERE location_id = ? 
 				ORDER BY display_at ASC 
 				LIMIT 120
 			`);
-			const { results } = await stmt.all<{ display_at: string; temp: number; pop: number; precip_accum: number; precip_snow: number; precip_mix: number; precip_rain: number; snow_level: number }>();
+			const { results } = await stmt.bind(locationId).all<{ display_at: string; temp: number; pop: number; precip_accum: number; precip_snow: number; precip_mix: number; precip_rain: number; snow_level: number }>();
 			
-			return new Response(renderSnowPage(results), {
+			return new Response(renderSnowPage(results, locationParam as "palisades" | "alpine"), {
 				headers: { "content-type": "text/html" },
 			});
 		}

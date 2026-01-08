@@ -9,16 +9,17 @@ export interface ForecastDataPoint {
 	snow_level: number;
 }
 
-export function renderSnowPage(data: ForecastDataPoint[]): string {
+export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" | "alpine" = "palisades"): string {
 	// Convert data to JSON for embedding in the page
 	const dataJson = JSON.stringify(data);
+	const locationName = location === "palisades" ? "Palisades" : "Alpine";
 
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Palisades Tahoe - Snow Forecast</title>
+	<title>${locationName} - Snow Forecast</title>
 	<script src="https://cdn.tailwindcss.com"></script>
 	<link rel="stylesheet" href="https://unpkg.com/uplot@1.6.30/dist/uPlot.min.css">
 	<script src="https://unpkg.com/uplot@1.6.30/dist/uPlot.iife.min.js"></script>
@@ -81,18 +82,43 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			font-size: 11px;
 			margin-top: 2px;
 		}
+		
+		/* Segmented toggle */
+		.segment-toggle {
+			display: inline-flex;
+			background: rgba(30, 41, 59, 0.8);
+			border-radius: 12px;
+			padding: 4px;
+			gap: 4px;
+		}
+		.segment-toggle a {
+			padding: 10px 24px;
+			border-radius: 8px;
+			font-weight: 600;
+			font-size: 15px;
+			text-decoration: none;
+			transition: all 0.2s ease;
+			color: #94a3b8;
+		}
+		.segment-toggle a:hover:not(.active) {
+			color: #e2e8f0;
+			background: rgba(148, 163, 184, 0.1);
+		}
+		.segment-toggle a.active {
+			background: linear-gradient(135deg, #3b82f6, #6366f1);
+			color: white;
+			box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+		}
 	</style>
 </head>
 <body class="bg-slate-900 min-h-screen">
 	<div class="max-w-7xl mx-auto px-4 py-8">
-		<!-- Header -->
+		<!-- Header with Location Toggle -->
 		<header class="mb-8">
-			<h1 class="text-3xl md:text-4xl font-bold text-white tracking-tight">
-				Palisades Tahoe
-			</h1>
-			<p class="text-slate-400 mt-2 text-lg">
-				5-Day Weather Forecast
-			</p>
+			<nav class="segment-toggle">
+				<a href="/snow?location=palisades" class="${location === "palisades" ? "active" : ""}">Palisades</a>
+				<a href="/snow?location=alpine" class="${location === "alpine" ? "active" : ""}">Alpine</a>
+			</nav>
 		</header>
 
 		<!-- Charts Container - Single scroll for all charts -->
