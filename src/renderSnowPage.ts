@@ -118,7 +118,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 					<div class="chart-section">
 						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
 							<span class="w-3 h-3 rounded-full bg-emerald-400"></span>
-							Precipitation Accumulation (in)
+							Cumulative Precipitation (in)
 						</h3>
 						<div id="chart-precip"></div>
 					</div>
@@ -152,12 +152,18 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		const timestamps = rawData.map(d => new Date(d.display_at).getTime() / 1000);
 		const temps = rawData.map(d => d.temp);
 		const pops = rawData.map(d => ((d.pop ?? 0) * 100)); // Convert 0.91 to 91%
-		const precipAccums = rawData.map(d => d.precip_accum ?? 0);
+		
+		// Calculate cumulative precipitation
+		let cumulative = 0;
+		const precipAccumsCumulative = rawData.map(d => {
+			cumulative += (d.precip_accum ?? 0);
+			return cumulative;
+		});
 		
 		// uPlot data format: [timestamps, series1]
 		const tempData = [timestamps, temps];
 		const popData = [timestamps, pops];
-		const precipData = [timestamps, precipAccums];
+		const precipData = [timestamps, precipAccumsCumulative];
 		
 		// Tooltip element
 		let tooltip = null;
@@ -203,9 +209,11 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				<div class="time">\${timeStr}</div>
 			\`;
 			
-			// Position tooltip at cursor
-			const left = u.valToPos(ts, 'x', true) + u.over.getBoundingClientRect().left + window.scrollX;
-			const top = u.valToPos(val, 'y', true) + u.over.getBoundingClientRect().top + window.scrollY;
+			// Position tooltip using cursor.left which is relative to the plot area
+			// u.cursor.left is the x position in pixels from the left of the plot area
+			const rect = u.over.getBoundingClientRect();
+			const left = rect.left + u.cursor.left;
+			const top = rect.top + u.valToPos(val, 'y') + window.scrollY;
 			
 			tooltip.style.left = left + 'px';
 			tooltip.style.top = top + 'px';
@@ -227,7 +235,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			};
 		}
 		
-		// Day/night background plugin
+		// Day/night background plugin with midnight lines
 		function dayNightPlugin() {
 			return {
 				hooks: {
@@ -249,6 +257,9 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 						let current = new Date(startDate);
 						current.setHours(0, 0, 0, 0);
 						
+						// Collect midnight timestamps for drawing lines later
+						const midnights = [];
+						
 						while (current <= endDate) {
 							const dayStart = new Date(current);
 							dayStart.setHours(6, 0, 0, 0); // 6 AM
@@ -266,6 +277,12 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 							nightEveningEnd.setDate(nightEveningEnd.getDate() + 1);
 							nightEveningEnd.setHours(0, 0, 0, 0);
 							
+							// Save midnight for line drawing
+							const midnightTs = nightMorningStart.getTime() / 1000;
+							if (midnightTs >= minTime && midnightTs <= maxTime) {
+								midnights.push(midnightTs);
+							}
+							
 							// Draw morning night (midnight to 6am)
 							drawTimeBlock(u, ctx, nightMorningStart, nightMorningEnd, 'rgba(71, 85, 105, 0.3)', left, top, width, height, minTime, maxTime);
 							
@@ -278,6 +295,21 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 							// Move to next day
 							current.setDate(current.getDate() + 1);
 						}
+						
+						// Draw vertical lines at midnight
+						ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+						ctx.lineWidth = 1;
+						ctx.setLineDash([4, 4]);
+						
+						midnights.forEach(ts => {
+							const x = u.valToPos(ts, 'x', true);
+							ctx.beginPath();
+							ctx.moveTo(x, top);
+							ctx.lineTo(x, top + height);
+							ctx.stroke();
+						});
+						
+						ctx.setLineDash([]); // Reset dash
 					}
 				}
 			};
