@@ -3,6 +3,7 @@ export interface ForecastDataPoint {
 	temp: number;
 	pop: number;
 	precip_accum: number;
+	precip_snow: number;
 }
 
 export function renderSnowPage(data: ForecastDataPoint[]): string {
@@ -123,6 +124,15 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 						<div id="chart-precip"></div>
 					</div>
 					
+					<!-- Snowfall Accumulation Chart -->
+					<div class="chart-section">
+						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
+							<span class="w-3 h-3 rounded-full bg-violet-400"></span>
+							Cumulative Snowfall (in)
+						</h3>
+						<div id="chart-snow"></div>
+					</div>
+					
 				</div>
 			</div>
 			
@@ -154,16 +164,24 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		const pops = rawData.map(d => ((d.pop ?? 0) * 100)); // Convert 0.91 to 91%
 		
 		// Calculate cumulative precipitation
-		let cumulative = 0;
+		let cumulativePrecip = 0;
 		const precipAccumsCumulative = rawData.map(d => {
-			cumulative += (d.precip_accum ?? 0);
-			return cumulative;
+			cumulativePrecip += (d.precip_accum ?? 0);
+			return cumulativePrecip;
+		});
+		
+		// Calculate cumulative snowfall
+		let cumulativeSnow = 0;
+		const snowAccumsCumulative = rawData.map(d => {
+			cumulativeSnow += (d.precip_snow ?? 0);
+			return cumulativeSnow;
 		});
 		
 		// uPlot data format: [timestamps, series1]
 		const tempData = [timestamps, temps];
 		const popData = [timestamps, pops];
 		const precipData = [timestamps, precipAccumsCumulative];
+		const snowData = [timestamps, snowAccumsCumulative];
 		
 		// Tooltip element
 		let tooltip = null;
@@ -445,6 +463,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			document.getElementById('chart-temp').innerHTML = '';
 			document.getElementById('chart-pop').innerHTML = '';
 			document.getElementById('chart-precip').innerHTML = '';
+			document.getElementById('chart-snow').innerHTML = '';
 			
 			// Temperature chart (no x-axis)
 			const tempOpts = createChartOptions(
@@ -474,18 +493,31 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			const popChart = new uPlot(popOpts, popData, document.getElementById('chart-pop'));
 			charts.push(popChart);
 			
-			// Precip accumulation chart (with x-axis)
+			// Precip accumulation chart (no x-axis)
 			const precipOpts = createChartOptions(
 				width,
-				height + 30, // Extra height for x-axis labels
+				height,
 				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
 				(v) => v.toFixed(2) + ' in',
 				'rgb(52, 211, 153)', // emerald-400
 				'Precipitation',
-				true
+				false
 			);
 			const precipChart = new uPlot(precipOpts, precipData, document.getElementById('chart-precip'));
 			charts.push(precipChart);
+			
+			// Snowfall accumulation chart (with x-axis - bottom chart)
+			const snowOpts = createChartOptions(
+				width,
+				height + 30, // Extra height for x-axis labels
+				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
+				(v) => v.toFixed(1) + ' in',
+				'rgb(167, 139, 250)', // violet-400
+				'Snowfall',
+				true
+			);
+			const snowChart = new uPlot(snowOpts, snowData, document.getElementById('chart-snow'));
+			charts.push(snowChart);
 			
 			// Set the wrapper width to match charts
 			document.getElementById('charts-wrapper').style.width = width + 'px';
