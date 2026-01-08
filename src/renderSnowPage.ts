@@ -4,6 +4,8 @@ export interface ForecastDataPoint {
 	pop: number;
 	precip_accum: number;
 	precip_snow: number;
+	precip_mix: number;
+	precip_rain: number;
 }
 
 export function renderSnowPage(data: ForecastDataPoint[]): string {
@@ -115,6 +117,26 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 						<div id="chart-pop"></div>
 					</div>
 					
+					<!-- Precipitation Amount Chart (multi-series) -->
+					<div class="chart-section">
+						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-4">
+							<span class="flex items-center gap-1">
+								<span class="w-3 h-3 rounded-full bg-blue-400"></span>
+								<span class="text-xs">Snow</span>
+							</span>
+							<span class="flex items-center gap-1">
+								<span class="w-3 h-3 rounded-full bg-purple-400"></span>
+								<span class="text-xs">Mix</span>
+							</span>
+							<span class="flex items-center gap-1">
+								<span class="w-3 h-3 rounded-full bg-green-400"></span>
+								<span class="text-xs">Rain</span>
+							</span>
+							<span class="ml-auto text-slate-400">Precipitation Amount (in)</span>
+						</h3>
+						<div id="chart-precip-amount"></div>
+					</div>
+					
 					<!-- Precipitation Accumulation Chart -->
 					<div class="chart-section">
 						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
@@ -177,9 +199,15 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			return cumulativeSnow;
 		});
 		
+		// Precipitation amount breakdown (hourly values)
+		const precipSnowHourly = rawData.map(d => d.precip_snow ?? 0);
+		const precipMixHourly = rawData.map(d => d.precip_mix ?? 0);
+		const precipRainHourly = rawData.map(d => d.precip_rain ?? 0);
+		
 		// uPlot data format: [timestamps, series1]
 		const tempData = [timestamps, temps];
 		const popData = [timestamps, pops];
+		const precipAmountData = [timestamps, precipSnowHourly, precipMixHourly, precipRainHourly];
 		const precipData = [timestamps, precipAccumsCumulative];
 		const snowData = [timestamps, snowAccumsCumulative];
 		
@@ -462,6 +490,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			
 			document.getElementById('chart-temp').innerHTML = '';
 			document.getElementById('chart-pop').innerHTML = '';
+			document.getElementById('chart-precip-amount').innerHTML = '';
 			document.getElementById('chart-precip').innerHTML = '';
 			document.getElementById('chart-snow').innerHTML = '';
 			
@@ -492,6 +521,112 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			popOpts.scales.y = { min: 0, max: 100 };
 			const popChart = new uPlot(popOpts, popData, document.getElementById('chart-pop'));
 			charts.push(popChart);
+			
+			// Precipitation Amount chart (multi-series: snow, mix, rain)
+			const precipAmountOpts = {
+				width: width,
+				height: height,
+				plugins: [dayNightPlugin(), {
+					hooks: {
+						setCursor: (u) => {
+							const idx = u.cursor.idx;
+							if (idx == null || idx < 0 || idx >= u.data[0].length) {
+								hideTooltip();
+								return;
+							}
+							
+							const ts = u.data[0][idx];
+							const snow = u.data[1][idx] ?? 0;
+							const mix = u.data[2][idx] ?? 0;
+							const rain = u.data[3][idx] ?? 0;
+							
+							const date = new Date(ts * 1000);
+							const timeStr = date.toLocaleString('en-US', { 
+								weekday: 'short', 
+								month: 'short', 
+								day: 'numeric',
+								hour: 'numeric',
+								minute: '2-digit'
+							});
+							
+							if (!tooltip) createTooltip();
+							tooltip.innerHTML = \`
+								<div style="display: flex; flex-direction: column; gap: 2px;">
+									<div class="value" style="color: rgb(96, 165, 250);">Snow: \${snow.toFixed(2)} in</div>
+									<div class="value" style="color: rgb(192, 132, 252);">Mix: \${mix.toFixed(2)} in</div>
+									<div class="value" style="color: rgb(74, 222, 128);">Rain: \${rain.toFixed(2)} in</div>
+								</div>
+								<div class="time">\${timeStr}</div>
+							\`;
+							
+							const rect = u.over.getBoundingClientRect();
+							const left = rect.left + u.cursor.left;
+							const top = rect.top + (height / 2) + window.scrollY;
+							
+							tooltip.style.left = left + 'px';
+							tooltip.style.top = top + 'px';
+							tooltip.style.display = 'block';
+						},
+						leave: () => {
+							hideTooltip();
+						}
+					}
+				}],
+				scales: {
+					x: { time: true },
+					y: { auto: true }
+				},
+				axes: [
+					{
+						show: false,
+						stroke: '#94a3b8',
+						grid: { stroke: 'rgba(148, 163, 184, 0.1)' },
+						ticks: { stroke: 'rgba(148, 163, 184, 0.3)' },
+						values: (u, splits) => splits.map(v => formatHour(v)),
+						font: '12px system-ui',
+						gap: 8,
+					},
+					{
+						stroke: '#94a3b8',
+						grid: { stroke: 'rgba(148, 163, 184, 0.15)' },
+						ticks: { stroke: 'rgba(148, 163, 184, 0.3)' },
+						values: (u, splits) => splits.map(v => v.toFixed(1) + '"'),
+						font: '12px system-ui',
+						size: 55,
+						gap: 8,
+					}
+				],
+				series: [
+					{},
+					{
+						label: 'Snow',
+						stroke: 'rgb(96, 165, 250)', // blue-400
+						width: 2,
+						fill: 'rgba(96, 165, 250, 0.15)',
+						points: { show: false },
+					},
+					{
+						label: 'Mix',
+						stroke: 'rgb(192, 132, 252)', // purple-400
+						width: 2,
+						fill: 'rgba(192, 132, 252, 0.15)',
+						points: { show: false },
+					},
+					{
+						label: 'Rain',
+						stroke: 'rgb(74, 222, 128)', // green-400
+						width: 2,
+						fill: 'rgba(74, 222, 128, 0.15)',
+						points: { show: false },
+					}
+				],
+				cursor: {
+					points: { size: 6, width: 2 }
+				},
+				legend: { show: false },
+			};
+			const precipAmountChart = new uPlot(precipAmountOpts, precipAmountData, document.getElementById('chart-precip-amount'));
+			charts.push(precipAmountChart);
 			
 			// Precip accumulation chart (no x-axis)
 			const precipOpts = createChartOptions(
