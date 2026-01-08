@@ -1,6 +1,8 @@
 export interface ForecastDataPoint {
 	display_at: string;
 	temp: number;
+	pop: number;
+	precip_accum: number;
 }
 
 export function renderSnowPage(data: ForecastDataPoint[]): string {
@@ -19,18 +21,35 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 	<style>
 		/* Custom scrollbar for the chart container */
 		.chart-scroll::-webkit-scrollbar {
-			height: 8px;
+			height: 10px;
 		}
 		.chart-scroll::-webkit-scrollbar-track {
-			background: #e5e7eb;
-			border-radius: 4px;
+			background: #1e293b;
+			border-radius: 5px;
 		}
 		.chart-scroll::-webkit-scrollbar-thumb {
-			background: #6366f1;
-			border-radius: 4px;
+			background: linear-gradient(90deg, #f97316, #ec4899);
+			border-radius: 5px;
 		}
 		.chart-scroll::-webkit-scrollbar-thumb:hover {
-			background: #4f46e5;
+			background: linear-gradient(90deg, #ea580c, #db2777);
+		}
+		
+		/* Chart section styling */
+		.chart-section {
+			border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+			padding-bottom: 0.5rem;
+			margin-bottom: 0.5rem;
+		}
+		.chart-section:last-child {
+			border-bottom: none;
+			padding-bottom: 0;
+			margin-bottom: 0;
+		}
+		
+		/* Ensure uPlot canvases align */
+		.u-wrap {
+			display: block !important;
 		}
 	</style>
 </head>
@@ -42,15 +61,42 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				Palisades Tahoe
 			</h1>
 			<p class="text-slate-400 mt-2 text-lg">
-				5-Day Temperature Forecast
+				5-Day Weather Forecast
 			</p>
 		</header>
 
-		<!-- Chart Container -->
+		<!-- Charts Container - Single scroll for all charts -->
 		<div class="bg-slate-800 rounded-2xl p-4 md:p-6 shadow-xl">
-			<div class="chart-scroll overflow-x-auto pb-2">
-				<div id="chart-wrapper" class="min-w-0">
-					<div id="chart"></div>
+			<div class="chart-scroll overflow-x-auto pb-2" id="charts-scroll-container">
+				<div id="charts-wrapper" class="min-w-0">
+					
+					<!-- Temperature Chart -->
+					<div class="chart-section">
+						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
+							<span class="w-3 h-3 rounded-full bg-orange-500"></span>
+							Temperature (°F)
+						</h3>
+						<div id="chart-temp"></div>
+					</div>
+					
+					<!-- Precipitation Chance Chart -->
+					<div class="chart-section">
+						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
+							<span class="w-3 h-3 rounded-full bg-sky-400"></span>
+							Chance of Precipitation (%)
+						</h3>
+						<div id="chart-pop"></div>
+					</div>
+					
+					<!-- Precipitation Accumulation Chart -->
+					<div class="chart-section">
+						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
+							<span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+							Precipitation Accumulation (in)
+						</h3>
+						<div id="chart-precip"></div>
+					</div>
+					
 				</div>
 			</div>
 			
@@ -79,9 +125,13 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		// Parse the data
 		const timestamps = rawData.map(d => new Date(d.display_at).getTime() / 1000);
 		const temps = rawData.map(d => d.temp);
+		const pops = rawData.map(d => d.pop ?? 0);
+		const precipAccums = rawData.map(d => d.precip_accum ?? 0);
 		
-		// uPlot data format: [timestamps, series1, series2, ...]
-		const uplotData = [timestamps, temps];
+		// uPlot data format: [timestamps, series1]
+		const tempData = [timestamps, temps];
+		const popData = [timestamps, pops];
+		const precipData = [timestamps, precipAccums];
 		
 		// Day/night background plugin
 		function dayNightPlugin() {
@@ -159,8 +209,8 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		
 		// Calculate chart dimensions
 		function getChartDimensions() {
-			const container = document.getElementById('chart-wrapper');
-			const containerWidth = container.parentElement.clientWidth;
+			const container = document.getElementById('charts-scroll-container');
+			const containerWidth = container.clientWidth;
 			const isMobile = window.innerWidth < 768;
 			
 			// Total hours of data
@@ -172,12 +222,12 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			
 			// Calculate chart width
 			// If we have more data than fits, make the chart wider to enable scrolling
-			const minWidth = containerWidth;
+			const minWidth = containerWidth - 20; // Account for padding
 			const scaledWidth = (totalHours / hoursPerScreenWidth) * containerWidth;
 			const chartWidth = Math.max(minWidth, scaledWidth);
 			
-			// Height
-			const chartHeight = isMobile ? 300 : 400;
+			// Height - smaller since we have 3 charts
+			const chartHeight = isMobile ? 180 : 220;
 			
 			return { width: chartWidth, height: chartHeight };
 		}
@@ -193,11 +243,9 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			return hour + (hour < 12 ? 'a' : 'p');
 		}
 		
-		// Initialize chart
-		function initChart() {
-			const { width, height } = getChartDimensions();
-			
-			const opts = {
+		// Create chart options
+		function createChartOptions(width, height, yAxisFormatter, seriesColor, seriesLabel, showXAxis = false) {
+			return {
 				width: width,
 				height: height,
 				plugins: [dayNightPlugin()],
@@ -211,7 +259,8 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				},
 				axes: [
 					{
-						// X axis
+						// X axis - only show on bottom chart
+						show: showXAxis,
 						stroke: '#94a3b8',
 						grid: { stroke: 'rgba(148, 163, 184, 0.1)' },
 						ticks: { stroke: 'rgba(148, 163, 184, 0.3)' },
@@ -224,19 +273,19 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 						stroke: '#94a3b8',
 						grid: { stroke: 'rgba(148, 163, 184, 0.15)' },
 						ticks: { stroke: 'rgba(148, 163, 184, 0.3)' },
-						values: (u, splits) => splits.map(v => v + '°F'),
+						values: yAxisFormatter,
 						font: '12px system-ui',
-						size: 50,
+						size: 55,
 						gap: 8,
 					}
 				],
 				series: [
 					{},
 					{
-						label: 'Temperature',
-						stroke: '#f97316',
+						label: seriesLabel,
+						stroke: seriesColor,
 						width: 2,
-						fill: 'rgba(249, 115, 22, 0.1)',
+						fill: seriesColor.replace(')', ', 0.15)').replace('rgb', 'rgba'),
 						points: {
 							show: false,
 						},
@@ -245,7 +294,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 				cursor: {
 					points: {
 						size: 8,
-						fill: '#f97316',
+						fill: seriesColor,
 						stroke: '#fff',
 						width: 2,
 					}
@@ -254,32 +303,77 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 					show: false,
 				},
 			};
+		}
+		
+		// Store chart instances
+		let charts = [];
+		
+		// Initialize all charts
+		function initCharts() {
+			const { width, height } = getChartDimensions();
 			
-			const chartEl = document.getElementById('chart');
-			chartEl.innerHTML = '';
+			// Clear existing charts
+			charts.forEach(c => c.destroy());
+			charts = [];
 			
-			const chart = new uPlot(opts, uplotData, chartEl);
+			document.getElementById('chart-temp').innerHTML = '';
+			document.getElementById('chart-pop').innerHTML = '';
+			document.getElementById('chart-precip').innerHTML = '';
 			
-			// Set the wrapper width to match chart
-			document.getElementById('chart-wrapper').style.width = width + 'px';
+			// Temperature chart (no x-axis)
+			const tempOpts = createChartOptions(
+				width, 
+				height, 
+				(u, splits) => splits.map(v => v + '°'),
+				'rgb(249, 115, 22)', // orange-500
+				'Temperature',
+				false
+			);
+			const tempChart = new uPlot(tempOpts, tempData, document.getElementById('chart-temp'));
+			charts.push(tempChart);
 			
-			return chart;
+			// POP chart (no x-axis)
+			const popOpts = createChartOptions(
+				width,
+				height,
+				(u, splits) => splits.map(v => v + '%'),
+				'rgb(56, 189, 248)', // sky-400
+				'Precipitation Chance',
+				false
+			);
+			// Force POP scale to 0-100
+			popOpts.scales.y = { min: 0, max: 100 };
+			const popChart = new uPlot(popOpts, popData, document.getElementById('chart-pop'));
+			charts.push(popChart);
+			
+			// Precip accumulation chart (with x-axis)
+			const precipOpts = createChartOptions(
+				width,
+				height + 30, // Extra height for x-axis labels
+				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
+				'rgb(52, 211, 153)', // emerald-400
+				'Precipitation',
+				true
+			);
+			const precipChart = new uPlot(precipOpts, precipData, document.getElementById('chart-precip'));
+			charts.push(precipChart);
+			
+			// Set the wrapper width to match charts
+			document.getElementById('charts-wrapper').style.width = width + 'px';
 		}
 		
 		// Initialize
-		let chart = initChart();
+		initCharts();
 		
 		// Handle resize
 		let resizeTimeout;
 		window.addEventListener('resize', () => {
 			clearTimeout(resizeTimeout);
 			resizeTimeout = setTimeout(() => {
-				chart.destroy();
-				chart = initChart();
+				initCharts();
 			}, 150);
 		});
 	</script>
 </body>
 </html>`;
 }
-
