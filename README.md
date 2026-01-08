@@ -1,59 +1,119 @@
-# Worker + D1 Database
+# Snow Weather App
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/d1-template)
+A Cloudflare Worker that fetches hourly snow forecast data from OpenSnow API and stores it in a D1 database.
 
-![Worker + D1 Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/cb7cb0a9-6102-4822-633c-b76b7bb25900/public)
+## Features
 
-<!-- dash-content-start -->
+- **Hourly Forecast Data**: Fetches detailed hourly snow forecasts from OpenSnow API
+- **Multiple Locations**: Tracks forecasts for Palisades Tahoe and Alpine Meadows
+- **Scheduled Updates**: Cron job runs every hour to fetch the latest forecast data
+- **D1 Database**: Stores forecast data with upsert (insert or update) behavior
 
-D1 is Cloudflare's native serverless SQL database ([docs](https://developers.cloudflare.com/d1/)). This project demonstrates using a Worker with a D1 binding to execute a SQL statement. A simple frontend displays the result of this query:
+## Database Schema
 
-```SQL
-SELECT * FROM comments LIMIT 3;
-```
+The `hourly_forecasts` table stores the following data from OpenSnow:
 
-The D1 database is initialized with a `comments` table and this data:
+| Field | Description |
+|-------|-------------|
+| `location_id` | OpenSnow location identifier |
+| `display_at` | Forecast timestamp (UTC) |
+| `display_at_local_label` | Human-readable local time label (e.g., "10a") |
+| `temp` | Temperature |
+| `pop` | Probability of precipitation (0-1) |
+| `precip_type` | Precipitation type code |
+| `precip_accum` | Total precipitation accumulation |
+| `precip_snow` | Snow accumulation |
+| `precip_mix` | Mixed precipitation |
+| `precip_rain` | Rain accumulation |
+| `precip_swe` | Snow water equivalent |
+| `snow_level` | Snow level elevation |
+| `slr` | Snow-to-liquid ratio |
 
-```SQL
-INSERT INTO comments (author, content)
-VALUES
-    ('Kristian', 'Congrats!'),
-    ('Serena', 'Great job!'),
-    ('Max', 'Keep up the good work!')
-;
-```
+## Cron Job
 
-> [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/d1-template#setup-steps) before deploying.
+The worker includes a scheduled handler that runs every hour (`0 * * * *`) to:
 
-<!-- dash-content-end -->
+1. Fetch hourly forecast data from OpenSnow API for each configured location
+2. Upsert the data into the `hourly_forecasts` D1 table
+3. Log results and any errors
 
 ## Getting Started
 
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
+### Setup Steps
 
-```
-npm create cloudflare@latest -- --template=cloudflare/templates/d1-template
-```
-
-A live public deployment of this template is available at [https://d1-template.templates.workers.dev](https://d1-template.templates.workers.dev)
-
-## Setup Steps
-
-1. Install the project dependencies with a package manager of your choice:
+1. Install the project dependencies:
    ```bash
    npm install
    ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "d1-template-database":
+
+2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "cf-d1-template-database":
    ```bash
-   npx wrangler d1 create d1-template-database
+   npx wrangler d1 create cf-d1-template-database
    ```
    ...and update the `database_id` field in `wrangler.json` with the new database ID.
-3. Run the following db migration to initialize the database (notice the `migrations` directory in this project):
+
+3. Run the database migrations to initialize the tables:
    ```bash
-   npx wrangler d1 migrations apply --remote d1-template-database
+   npx wrangler d1 migrations apply --remote cf-d1-template-database
    ```
-4. Deploy the project!
+
+4. Deploy the project:
    ```bash
    npx wrangler deploy
    ```
+
+## Local Development
+
+### Running the Worker Locally
+
+```bash
+npx wrangler dev
+```
+
+### Testing the Cron Job Locally
+
+Start the dev server with scheduled handler support:
+
+```bash
+npx wrangler dev --test-scheduled
+```
+
+Then trigger the cron job manually:
+
+```bash
+curl "http://localhost:8787/__scheduled?cron=0+*+*+*+*"
+```
+
+### Applying Migrations Locally
+
+```bash
+npx wrangler d1 migrations apply --local cf-d1-template-database
+```
+
+## Configuring the Cron Schedule
+
+The cron schedule is defined in `wrangler.json`:
+
+```json
+{
+  "triggers": {
+    "crons": ["0 * * * *"]
+  }
+}
+```
+
+The default schedule `0 * * * *` runs at the top of every hour. You can modify this to any valid cron expression.
+
+## Adding More Locations
+
+To track additional ski resorts, edit the `LOCATIONS` array in `src/opensnow.ts`:
+
+```typescript
+export const LOCATIONS = [
+  { slug: "palisadestahoe", name: "Palisades Tahoe" },
+  { slug: "alpine-meadows-ca-us", name: "Alpine Meadows" },
+  // Add more locations here
+] as const;
+```
+
+Find location slugs by visiting the resort page on [OpenSnow](https://opensnow.com) and copying the slug from the URL.
