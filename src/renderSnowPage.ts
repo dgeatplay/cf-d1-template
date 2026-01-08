@@ -6,6 +6,7 @@ export interface ForecastDataPoint {
 	precip_snow: number;
 	precip_mix: number;
 	precip_rain: number;
+	snow_level: number;
 }
 
 export function renderSnowPage(data: ForecastDataPoint[]): string {
@@ -155,6 +156,15 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 						<div id="chart-snow"></div>
 					</div>
 					
+					<!-- Snow Level Chart -->
+					<div class="chart-section">
+						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
+							<span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+							Snow Level (ft)
+						</h3>
+						<div id="chart-snow-level"></div>
+					</div>
+					
 				</div>
 			</div>
 			
@@ -204,12 +214,16 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 		const precipMixHourly = rawData.map(d => d.precip_mix ?? 0);
 		const precipRainHourly = rawData.map(d => d.precip_rain ?? 0);
 		
+		// Snow level (elevation in feet)
+		const snowLevels = rawData.map(d => d.snow_level ?? 0);
+		
 		// uPlot data format: [timestamps, series1]
 		const tempData = [timestamps, temps];
 		const popData = [timestamps, pops];
 		const precipAmountData = [timestamps, precipSnowHourly, precipMixHourly, precipRainHourly];
 		const precipData = [timestamps, precipAccumsCumulative];
 		const snowData = [timestamps, snowAccumsCumulative];
+		const snowLevelData = [timestamps, snowLevels];
 		
 		// Tooltip element
 		let tooltip = null;
@@ -493,6 +507,7 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			document.getElementById('chart-precip-amount').innerHTML = '';
 			document.getElementById('chart-precip').innerHTML = '';
 			document.getElementById('chart-snow').innerHTML = '';
+			document.getElementById('chart-snow-level').innerHTML = '';
 			
 			// Temperature chart (no x-axis)
 			const tempOpts = createChartOptions(
@@ -641,18 +656,31 @@ export function renderSnowPage(data: ForecastDataPoint[]): string {
 			const precipChart = new uPlot(precipOpts, precipData, document.getElementById('chart-precip'));
 			charts.push(precipChart);
 			
-			// Snowfall accumulation chart (with x-axis - bottom chart)
+			// Snowfall accumulation chart (no x-axis)
 			const snowOpts = createChartOptions(
 				width,
-				height + 30, // Extra height for x-axis labels
+				height,
 				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
 				(v) => v.toFixed(1) + ' in',
 				'rgb(167, 139, 250)', // violet-400
 				'Snowfall',
-				true
+				false
 			);
 			const snowChart = new uPlot(snowOpts, snowData, document.getElementById('chart-snow'));
 			charts.push(snowChart);
+			
+			// Snow level chart (with x-axis - bottom chart)
+			const snowLevelOpts = createChartOptions(
+				width,
+				height + 30, // Extra height for x-axis labels
+				(u, splits) => splits.map(v => (v / 1000).toFixed(1) + 'k'),
+				(v) => v.toLocaleString() + ' ft',
+				'rgb(34, 211, 238)', // cyan-400
+				'Snow Level',
+				true
+			);
+			const snowLevelChart = new uPlot(snowLevelOpts, snowLevelData, document.getElementById('chart-snow-level'));
+			charts.push(snowLevelChart);
 			
 			// Set the wrapper width to match charts
 			document.getElementById('charts-wrapper').style.width = width + 'px';

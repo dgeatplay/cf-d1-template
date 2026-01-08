@@ -188,13 +188,13 @@ export default {
 		// Snow forecast page for Palisades Tahoe
 		if (url.pathname === "/snow") {
 			const stmt = env.DB.prepare(`
-				SELECT display_at, temp, pop, precip_accum, precip_snow, precip_mix, precip_rain 
+				SELECT display_at, temp, pop, precip_accum, precip_snow, precip_mix, precip_rain, snow_level 
 				FROM hourly_forecasts 
 				WHERE location_id = '141' 
 				ORDER BY display_at ASC 
 				LIMIT 120
 			`);
-			const { results } = await stmt.all<{ display_at: string; temp: number; pop: number; precip_accum: number; precip_snow: number; precip_mix: number; precip_rain: number }>();
+			const { results } = await stmt.all<{ display_at: string; temp: number; pop: number; precip_accum: number; precip_snow: number; precip_mix: number; precip_rain: number; snow_level: number }>();
 			
 			return new Response(renderSnowPage(results), {
 				headers: { "content-type": "text/html" },
