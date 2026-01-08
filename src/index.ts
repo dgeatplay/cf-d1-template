@@ -194,6 +194,7 @@ export default {
 				SELECT display_at, temp, pop, precip_accum, precip_snow, precip_mix, precip_rain, snow_level 
 				FROM hourly_forecasts 
 				WHERE location_id = ? 
+				  AND display_at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
 				ORDER BY display_at ASC 
 				LIMIT 120
 			`);
