@@ -19,11 +19,11 @@ export interface OpenSnowLocation {
 	id: number;
 	name: string;
 	slug: string;
+	forecast_hourly: ForecastHourly[];
 }
 
 export interface OpenSnowApiResponse {
 	location: OpenSnowLocation;
-	forecast_hourly: ForecastHourly[];
 }
 
 // Locations of interest
@@ -77,35 +77,30 @@ export async function fetchLocationForecast(locationSlug: string): Promise<Fetch
 			return { data: null, error: `OpenSnow API error: ${response.status}` };
 		}
 
-		const rawData = await response.json();
+		const rawData = await response.json() as OpenSnowApiResponse;
 		
 		// Debug: Log the structure of the response
 		console.log(`Raw response type for ${locationSlug}:`, typeof rawData);
 		console.log(`Raw response keys for ${locationSlug}:`, rawData ? Object.keys(rawData) : 'null');
 		
 		if (rawData?.location) {
-			console.log(`Location data for ${locationSlug}:`, JSON.stringify(rawData.location));
+			console.log(`Location found for ${locationSlug}: id=${rawData.location.id}, name=${rawData.location.name}`);
+			console.log(`Location object keys:`, Object.keys(rawData.location));
+			
+			// forecast_hourly is nested inside location
+			if (rawData.location.forecast_hourly) {
+				console.log(`forecast_hourly found for ${locationSlug}: ${rawData.location.forecast_hourly.length} records`);
+				if (rawData.location.forecast_hourly.length > 0) {
+					console.log(`First hourly record sample:`, JSON.stringify(rawData.location.forecast_hourly[0]));
+				}
+			} else {
+				console.log(`No forecast_hourly array found inside location for ${locationSlug}`);
+			}
 		} else {
 			console.log(`No location object found for ${locationSlug}`);
 		}
 		
-		if (rawData?.forecast_hourly) {
-			console.log(`forecast_hourly found for ${locationSlug}: ${rawData.forecast_hourly.length} records`);
-			if (rawData.forecast_hourly.length > 0) {
-				console.log(`First hourly record sample:`, JSON.stringify(rawData.forecast_hourly[0]));
-			}
-		} else {
-			console.log(`No forecast_hourly array found for ${locationSlug}`);
-			// Check for other possible field names
-			const possibleFields = ['hourly', 'forecast', 'forecasts', 'data', 'hourly_forecast'];
-			for (const field of possibleFields) {
-				if (rawData?.[field]) {
-					console.log(`Found alternative field '${field}' with type:`, typeof rawData[field], Array.isArray(rawData[field]) ? `(array of ${rawData[field].length})` : '');
-				}
-			}
-		}
-		
-		const data = rawData as OpenSnowApiResponse;
+		const data = rawData;
 		return { data };
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : "Unknown error";

@@ -63,19 +63,19 @@ async function processLocationForecasts(
 		return { success: false, recordCount: 0, error: result.error };
 	}
 
-	console.log(`Result data structure for ${locationSlug}:`, JSON.stringify({
-		hasLocation: !!result.data.location,
-		locationId: result.data.location?.id,
-		locationName: result.data.location?.name,
-		hasForecastHourly: !!result.data.forecast_hourly,
-		forecastHourlyLength: result.data.forecast_hourly?.length ?? 0,
-	}));
+	const { location } = result.data;
+	const forecast_hourly = location.forecast_hourly;
 
-	const { location, forecast_hourly } = result.data;
+	console.log(`Result data structure for ${locationSlug}:`, JSON.stringify({
+		hasLocation: !!location,
+		locationId: location?.id,
+		locationName: location?.name,
+		hasForecastHourly: !!forecast_hourly,
+		forecastHourlyLength: forecast_hourly?.length ?? 0,
+	}));
 
 	if (!forecast_hourly || forecast_hourly.length === 0) {
 		console.log(`No hourly forecast data for ${locationSlug}`);
-		console.log(`Full result.data keys:`, Object.keys(result.data));
 		return { success: true, recordCount: 0 };
 	}
 
