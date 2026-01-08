@@ -59,13 +59,23 @@ async function processLocationForecasts(
 	const result = await fetchLocationForecast(locationSlug);
 
 	if (!result.data) {
+		console.log(`No data returned for ${locationSlug}, error: ${result.error}`);
 		return { success: false, recordCount: 0, error: result.error };
 	}
+
+	console.log(`Result data structure for ${locationSlug}:`, JSON.stringify({
+		hasLocation: !!result.data.location,
+		locationId: result.data.location?.id,
+		locationName: result.data.location?.name,
+		hasForecastHourly: !!result.data.forecast_hourly,
+		forecastHourlyLength: result.data.forecast_hourly?.length ?? 0,
+	}));
 
 	const { location, forecast_hourly } = result.data;
 
 	if (!forecast_hourly || forecast_hourly.length === 0) {
 		console.log(`No hourly forecast data for ${locationSlug}`);
+		console.log(`Full result.data keys:`, Object.keys(result.data));
 		return { success: true, recordCount: 0 };
 	}
 
@@ -121,8 +131,59 @@ async function processLocationForecasts(
 	}
 }
 
+/**
+ * Run the forecast fetch for all locations (shared by scheduled and manual trigger)
+ */
+async function runForecastFetch(db: D1Database): Promise<{
+	totalRecords: number;
+	results: Array<{ location: string; success: boolean; recordCount: number; error?: string }>;
+}> {
+	console.log("Starting OpenSnow forecast fetch...");
+
+	const results: Array<{ location: string; success: boolean; recordCount: number; error?: string }> = [];
+
+	// Fetch forecasts for all locations in parallel
+	const fetchPromises = LOCATIONS.map(async (loc) => {
+		const result = await processLocationForecasts(db, loc.slug);
+		return { location: loc.name, ...result };
+	});
+
+	const locationResults = await Promise.all(fetchPromises);
+	results.push(...locationResults);
+
+	const totalRecords = results.reduce((sum, r) => sum + r.recordCount, 0);
+	const errors = results.filter((r) => !r.success);
+
+	console.log(`Completed forecast update: ${totalRecords} total records`);
+	if (errors.length > 0) {
+		console.error("Errors:", JSON.stringify(errors));
+	}
+
+	return { totalRecords, results };
+}
+
 export default {
 	async fetch(request, env) {
+		const url = new URL(request.url);
+
+		// Debug endpoint to manually trigger the cron job
+		if (url.pathname === "/trigger-cron") {
+			console.log("Manual cron trigger via /trigger-cron endpoint");
+			const { totalRecords, results } = await runForecastFetch(env.DB);
+			
+			return new Response(
+				JSON.stringify({
+					success: true,
+					message: `Cron triggered manually. Updated ${totalRecords} records.`,
+					results,
+					triggeredAt: new Date().toISOString(),
+				}, null, 2),
+				{
+					headers: { "content-type": "application/json" },
+				}
+			);
+		}
+
 		const stmt = env.DB.prepare("SELECT * FROM comments LIMIT 3");
 		const { results } = await stmt.all();
 
@@ -134,27 +195,10 @@ export default {
 	},
 
 	async scheduled(event, env, ctx) {
-		console.log("Starting scheduled OpenSnow forecast fetch...");
+		console.log("Scheduled cron triggered");
 		console.log(`Cron pattern: ${event.cron}`);
 		console.log(`Scheduled time: ${new Date(event.scheduledTime).toISOString()}`);
 
-		const results: Array<{ location: string; success: boolean; recordCount: number; error?: string }> = [];
-
-		// Fetch forecasts for all locations in parallel
-		const fetchPromises = LOCATIONS.map(async (loc) => {
-			const result = await processLocationForecasts(env.DB, loc.slug);
-			return { location: loc.name, ...result };
-		});
-
-		const locationResults = await Promise.all(fetchPromises);
-		results.push(...locationResults);
-
-		const totalRecords = results.reduce((sum, r) => sum + r.recordCount, 0);
-		const errors = results.filter((r) => !r.success);
-
-		console.log(`Completed forecast update: ${totalRecords} total records`);
-		if (errors.length > 0) {
-			console.error("Errors:", errors);
-		}
+		await runForecastFetch(env.DB);
 	},
 } satisfies ExportedHandler<Env>;

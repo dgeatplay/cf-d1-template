@@ -62,6 +62,11 @@ The worker includes a scheduled handler that runs every hour (`0 * * * *`) to:
    npx wrangler deploy
    ```
 
+5. Check logs:
+   ```bash
+   npx wrangler tail
+   ```
+   
 ## Local Development
 
 ### Running the Worker Locally

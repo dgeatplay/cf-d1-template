@@ -59,6 +59,7 @@ export async function fetchLocationForecast(locationSlug: string): Promise<Fetch
 	const url = `https://opensnow.com/mtn/location/${locationSlug}/forecast/snow-detail?v=1&api_key=60600760edf827a75df71f712b71e3f3&days=15&units=imperial&with_weather_stations=true`;
 
 	console.log(`Fetching forecast for ${locationSlug}...`);
+	console.log(`Request URL: ${url}`);
 
 	try {
 		const response = await fetch(url, {
@@ -66,16 +67,52 @@ export async function fetchLocationForecast(locationSlug: string): Promise<Fetch
 			headers: API_HEADERS,
 		});
 
+		console.log(`Response status for ${locationSlug}: ${response.status} ${response.statusText}`);
+		console.log(`Response headers:`, Object.fromEntries(response.headers.entries()));
+
 		if (!response.ok) {
+			const errorBody = await response.text();
 			console.error(`OpenSnow API error for ${locationSlug}:`, response.status, response.statusText);
+			console.error(`Error response body (first 500 chars):`, errorBody.substring(0, 500));
 			return { data: null, error: `OpenSnow API error: ${response.status}` };
 		}
 
-		const data = await response.json() as OpenSnowApiResponse;
+		const rawData = await response.json();
+		
+		// Debug: Log the structure of the response
+		console.log(`Raw response type for ${locationSlug}:`, typeof rawData);
+		console.log(`Raw response keys for ${locationSlug}:`, rawData ? Object.keys(rawData) : 'null');
+		
+		if (rawData?.location) {
+			console.log(`Location data for ${locationSlug}:`, JSON.stringify(rawData.location));
+		} else {
+			console.log(`No location object found for ${locationSlug}`);
+		}
+		
+		if (rawData?.forecast_hourly) {
+			console.log(`forecast_hourly found for ${locationSlug}: ${rawData.forecast_hourly.length} records`);
+			if (rawData.forecast_hourly.length > 0) {
+				console.log(`First hourly record sample:`, JSON.stringify(rawData.forecast_hourly[0]));
+			}
+		} else {
+			console.log(`No forecast_hourly array found for ${locationSlug}`);
+			// Check for other possible field names
+			const possibleFields = ['hourly', 'forecast', 'forecasts', 'data', 'hourly_forecast'];
+			for (const field of possibleFields) {
+				if (rawData?.[field]) {
+					console.log(`Found alternative field '${field}' with type:`, typeof rawData[field], Array.isArray(rawData[field]) ? `(array of ${rawData[field].length})` : '');
+				}
+			}
+		}
+		
+		const data = rawData as OpenSnowApiResponse;
 		return { data };
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : "Unknown error";
 		console.error(`Failed to fetch forecast for ${locationSlug}:`, errorMessage);
+		if (error instanceof Error && error.stack) {
+			console.error(`Stack trace:`, error.stack);
+		}
 		return { data: null, error: errorMessage };
 	}
 }
