@@ -40,18 +40,6 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 			background: linear-gradient(90deg, #ea580c, #db2777);
 		}
 		
-		/* Chart section styling */
-		.chart-section {
-			border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-			padding-bottom: 0.5rem;
-			margin-bottom: 0.5rem;
-		}
-		.chart-section:last-child {
-			border-bottom: none;
-			padding-bottom: 0;
-			margin-bottom: 0;
-		}
-		
 		/* Ensure uPlot canvases align */
 		.u-wrap {
 			display: block !important;
@@ -112,9 +100,9 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 	</style>
 </head>
 <body class="bg-slate-900 min-h-screen">
-	<div class="max-w-7xl mx-auto px-4 py-8">
+	<div class="max-w-7xl mx-auto py-4">
 		<!-- Header with Location Toggle -->
-		<header class="mb-8">
+		<header class="mb-2 px-4">
 			<nav class="segment-toggle">
 				<a href="/snow?location=palisades" class="${location === "palisades" ? "active" : ""}">Palisades</a>
 				<a href="/snow?location=alpine" class="${location === "alpine" ? "active" : ""}">Alpine</a>
@@ -122,14 +110,13 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 		</header>
 
 		<!-- Charts Container - Single scroll for all charts -->
-		<div class="bg-slate-800 rounded-2xl p-4 md:p-6 shadow-xl">
+		<div class="bg-slate-900 p-0 md:p-6 shadow-xl">
 			<div class="chart-scroll overflow-x-auto pb-2" id="charts-scroll-container">
 				<div id="charts-wrapper" class="min-w-0">
 					
 					<!-- Temperature Chart -->
 					<div class="chart-section">
-						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
-							<span class="w-3 h-3 rounded-full bg-orange-500"></span>
+						<h3 class="px-4 text-slate-300 text-xs font-medium flex items-center gap-2">
 							Temperature (°F)
 						</h3>
 						<div id="chart-temp"></div>
@@ -137,8 +124,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 					
 					<!-- Precipitation Chance Chart -->
 					<div class="chart-section">
-						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
-							<span class="w-3 h-3 rounded-full bg-sky-400"></span>
+						<h3 class="px-4 text-slate-300 text-xs font-medium flex items-center gap-2">
 							Chance of Precipitation (%)
 						</h3>
 						<div id="chart-pop"></div>
@@ -146,7 +132,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 					
 					<!-- Precipitation Amount Chart (multi-series) -->
 					<div class="chart-section">
-						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-4">
+						<h3 class="px-4 text-slate-300 text-sm font-medium flex items-center gap-4">
 							<span class="flex items-center gap-1">
 								<span class="w-3 h-3 rounded-full bg-blue-400"></span>
 								<span class="text-xs">Snow</span>
@@ -157,7 +143,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 							</span>
 							<span class="flex items-center gap-1">
 								<span class="w-3 h-3 rounded-full bg-green-400"></span>
-								<span class="text-xs">Rain</span>
+								<span class="text-xs">Rain (inches)</span>
 							</span>
 							<span class="ml-auto text-slate-400">Precipitation Amount (in)</span>
 						</h3>
@@ -166,8 +152,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 					
 					<!-- Precipitation Accumulation Chart -->
 					<div class="chart-section">
-						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
-							<span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+						<h3 class="px-4 text-slate-300 text-xs font-medium flex items-center gap-2">
 							Cumulative Precipitation (in)
 						</h3>
 						<div id="chart-precip"></div>
@@ -175,8 +160,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 					
 					<!-- Snowfall Accumulation Chart -->
 					<div class="chart-section">
-						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
-							<span class="w-3 h-3 rounded-full bg-violet-400"></span>
+						<h3 class="px-4 text-slate-300 text-xs font-medium flex items-center gap-2">
 							Cumulative Snowfall (in)
 						</h3>
 						<div id="chart-snow"></div>
@@ -184,8 +168,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 					
 					<!-- Snow Level Chart -->
 					<div class="chart-section">
-						<h3 class="text-slate-300 text-sm font-medium mb-2 flex items-center gap-2">
-							<span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+						<h3 class="px-4 text-slate-300 text-xs font-medium flex items-center gap-2">
 							Snow Level (ft)
 						</h3>
 						<div id="chart-snow-level"></div>
@@ -194,22 +177,11 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 				</div>
 			</div>
 			
-			<!-- Legend -->
-			<div class="flex items-center gap-6 mt-4 pt-4 border-t border-slate-700">
-				<div class="flex items-center gap-2">
-					<div class="w-4 h-4 rounded bg-white/90 border border-slate-600"></div>
-					<span class="text-slate-400 text-sm">Daytime (6am-6pm)</span>
-				</div>
-				<div class="flex items-center gap-2">
-					<div class="w-4 h-4 rounded bg-slate-600/50 border border-slate-600"></div>
-					<span class="text-slate-400 text-sm">Nighttime</span>
-				</div>
-			</div>
 		</div>
 
 		<!-- Data info -->
 		<p class="text-slate-500 text-sm mt-4 text-center">
-			Data points: ${data.length} hours • Scroll horizontally to see more days
+			Data points: ${data.length} hours
 		</p>
 	</div>
 
@@ -631,7 +603,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 						stroke: '#94a3b8',
 						grid: { stroke: 'rgba(148, 163, 184, 0.15)' },
 						ticks: { stroke: 'rgba(148, 163, 184, 0.3)' },
-						values: (u, splits) => splits.map(v => v.toFixed(1) + '"'),
+						values: (u, splits) => splits.map(v => v.toFixed(0) + '"'),
 						font: '12px system-ui',
 						size: 55,
 						gap: 8,
@@ -673,7 +645,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 			const precipOpts = createChartOptions(
 				width,
 				height,
-				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
+				(u, splits) => splits.map(v => v.toFixed(0) + '"'),
 				(v) => v.toFixed(2) + ' in',
 				'rgb(52, 211, 153)', // emerald-400
 				'Precipitation',
@@ -686,7 +658,7 @@ export function renderSnowPage(data: ForecastDataPoint[], location: "palisades" 
 			const snowOpts = createChartOptions(
 				width,
 				height,
-				(u, splits) => splits.map(v => v.toFixed(1) + '"'),
+				(u, splits) => splits.map(v => v.toFixed(0) + '"'),
 				(v) => v.toFixed(1) + ' in',
 				'rgb(167, 139, 250)', // violet-400
 				'Snowfall',
